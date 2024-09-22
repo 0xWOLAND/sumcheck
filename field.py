@@ -47,3 +47,90 @@ class Polynomial:
             result = (result + coeff * power) % self.field.prime
             power = (power * x) % self.field.prime
         return result
+
+class MultivariatePolynomial:
+    def __init__(self, coefficients, variables, field: FiniteField):
+        """
+        coefficients: dict mapping tuples of exponents to coefficients
+        variables: list of variable names
+        """
+        self.coefficients = {tuple(k): v % field.prime for k, v in coefficients.items()}
+        self.variables = variables
+        self.field = field
+
+    def add(self, other):
+        result = self.coefficients.copy()
+        for exponents, coeff in other.coefficients.items():
+            if exponents in result:
+                result[exponents] = (result[exponents] + coeff) % self.field.prime
+                if result[exponents] == 0:
+                    del result[exponents]
+            else:
+                result[exponents] = coeff
+        return MultivariatePolynomial(result, self.variables, self.field)
+
+    def multiply(self, other):
+        # FFT-based multiplication for multivariate polynomials
+        import torch
+        import math
+
+        # Determine the size for each dimension
+        max_exponents = tuple(
+            max(
+                max((k[i] for k in self.coefficients.keys()), default=0),
+                max((k[i] for k in other.coefficients.keys()), default=0)
+            )
+            for i in range(len(self.variables))
+        )
+        
+        # Create tensors for self and other
+        self_tensor = torch.zeros(tuple(m+1 for m in max_exponents), dtype=torch.float)
+        other_tensor = torch.zeros(tuple(m+1 for m in max_exponents), dtype=torch.float)
+        
+        for exponents, coeff in self.coefficients.items():
+            self_tensor[exponents] = coeff
+        for exponents, coeff in other.coefficients.items():
+            other_tensor[exponents] = coeff
+        
+        # Perform FFT on each dimension
+        self_fft = torch.fft.fftn(self_tensor)
+        other_fft = torch.fft.fftn(other_tensor)
+        
+        # Element-wise multiplication in frequency domain
+        result_fft = self_fft * other_fft
+        
+        # Inverse FFT to get the convolution result
+        result_ifft = torch.fft.ifftn(result_fft).real.round().long() % self.field.prime
+        
+        # Extract non-zero coefficients
+        result_coefficients = {}
+        it = torch.nonzero(result_ifft)
+        for idx in it:
+            exponents = tuple(idx.tolist())
+            coeff = result_ifft[exponents].item()
+            if coeff != 0:
+                result_coefficients[exponents] = coeff
+        
+        return MultivariatePolynomial(result_coefficients, self.variables, self.field)
+
+    def evaluate(self, assignments):
+        """
+        assignments: dict mapping variable names to values
+        """
+        result = 0
+        for exponents, coeff in self.coefficients.items():
+            term = coeff
+            for var, exp in zip(self.variables, exponents):
+                term = (term * pow(assignments[var], exp, self.field.prime)) % self.field.prime
+            result = (result + term) % self.field.prime
+        return result
+
+    def __repr__(self):
+        terms = []
+        for exponents, coeff in sorted(self.coefficients.items()):
+            term = str(coeff)
+            for var, exp in zip(self.variables, exponents):
+                if exp != 0:
+                    term += f"*{var}^{exp}"
+            terms.append(term)
+        return " + ".join(terms) if terms else "0"
