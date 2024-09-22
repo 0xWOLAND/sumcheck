@@ -1,5 +1,6 @@
 from field import FiniteField, Polynomial
 
+
 class SumCheck:
     def __init__(self, field: FiniteField, polynomial: Polynomial):
         self.field = field
@@ -17,20 +18,21 @@ class SumCheck:
         # Implement the verifier's logic here
         pass
 
+
 def main():
     # Example usage of SumCheck Protocol
     prime = 17
     field = FiniteField(prime)
     coefficients = [1, 2, 3]  # Example polynomial coefficients
     polynomial = Polynomial(coefficients, field)
-    
+
     sumcheck = SumCheck(field, polynomial)
-    
+
     # Example protocol execution
     # prover_response = sumcheck.prover_step(partial_assignment)
     # verifier_valid = sumcheck.verifier_step(prover_response)
     # print("Verifier accepts:", verifier_valid)
 
+
 if __name__ == "__main__":
     main()
-

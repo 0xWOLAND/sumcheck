@@ -1,5 +1,6 @@
 import torch
 
+
 class FiniteField:
     def __init__(self, prime):
         self.prime = prime
@@ -19,6 +20,7 @@ class FiniteField:
     def divide(self, a, b):
         return self.multiply(a, self.inverse(b))
 
+
 class Polynomial:
     def __init__(self, coefficients, field: FiniteField):
         self.coefficients = torch.tensor(coefficients, dtype=torch.long)
@@ -26,15 +28,19 @@ class Polynomial:
 
     def add(self, other):
         max_len = max(len(self.coefficients), len(other.coefficients))
-        a = torch.nn.functional.pad(self.coefficients, (0, max_len - len(self.coefficients)), value=0)
-        b = torch.nn.functional.pad(other.coefficients, (0, max_len - len(other.coefficients)), value=0)
+        a = torch.nn.functional.pad(
+            self.coefficients, (0, max_len - len(self.coefficients)), value=0
+        )
+        b = torch.nn.functional.pad(
+            other.coefficients, (0, max_len - len(other.coefficients)), value=0
+        )
         result = (a + b) % self.field.prime
         return Polynomial(result.tolist(), self.field)
 
     def multiply(self, other):
         # FFT-based multiplication
         n = len(self.coefficients) + len(other.coefficients) - 1
-        n_fft = 1 << (n-1).bit_length()  # Next power of 2
+        n_fft = 1 << (n - 1).bit_length()  # Next power of 2
         a = torch.fft.fft(self.coefficients.float(), n=n_fft)
         b = torch.fft.fft(other.coefficients.float(), n=n_fft)
         result = torch.fft.ifft(a * b).real.round().long()[:n] % self.field.prime
@@ -47,6 +53,7 @@ class Polynomial:
             result = (result + coeff * power) % self.field.prime
             power = (power * x) % self.field.prime
         return result
+
 
 class MultivariatePolynomial:
     def __init__(self, coefficients, variables, field: FiniteField):
@@ -76,11 +83,11 @@ class MultivariatePolynomial:
 
         # Determine the maximum exponents for each variable in self and other
         max_self_exponents = [
-            max((k[i] for k in self.coefficients.keys()), default=0) 
+            max((k[i] for k in self.coefficients.keys()), default=0)
             for i in range(len(self.variables))
         ]
         max_other_exponents = [
-            max((k[i] for k in other.coefficients.keys()), default=0) 
+            max((k[i] for k in other.coefficients.keys()), default=0)
             for i in range(len(self.variables))
         ]
 
@@ -90,9 +97,7 @@ class MultivariatePolynomial:
         ]
 
         # Optionally, pad each dimension to the next power of two for FFT efficiency
-        padded_size = [
-            1 << (size - 1).bit_length() for size in result_size
-        ]
+        padded_size = [1 << (size - 1).bit_length() for size in result_size]
 
         # Initialize tensors with the padded sizes
         self_tensor = torch.zeros(padded_size, dtype=torch.float)
@@ -100,10 +105,14 @@ class MultivariatePolynomial:
 
         # Populate the tensors with coefficients
         for exponents, coeff in self.coefficients.items():
-            if all(0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))):
+            if all(
+                0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))
+            ):
                 self_tensor[exponents] = coeff
         for exponents, coeff in other.coefficients.items():
-            if all(0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))):
+            if all(
+                0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))
+            ):
                 other_tensor[exponents] = coeff
 
         # Perform FFT on each dimension
@@ -135,7 +144,9 @@ class MultivariatePolynomial:
         for exponents, coeff in self.coefficients.items():
             term = coeff
             for var, exp in zip(self.variables, exponents):
-                term = (term * pow(assignments[var], exp, self.field.prime)) % self.field.prime
+                term = (
+                    term * pow(assignments[var], exp, self.field.prime)
+                ) % self.field.prime
             result = (result + term) % self.field.prime
         return result
 
