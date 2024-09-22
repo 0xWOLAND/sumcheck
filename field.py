@@ -54,6 +54,17 @@ class Polynomial:
             power = (power * x) % self.field.prime
         return result
 
+    def subtract(self, other):
+        max_len = max(len(self.coefficients), len(other.coefficients))
+        a = torch.nn.functional.pad(
+            self.coefficients, (0, max_len - len(self.coefficients)), value=0
+        )
+        b = torch.nn.functional.pad(
+            other.coefficients, (0, max_len - len(other.coefficients)), value=0
+        )
+        result = (a - b) % self.field.prime
+        return Polynomial(result.tolist(), self.field)
+
 
 class MultivariatePolynomial:
     def __init__(self, coefficients, variables, field: FiniteField):
@@ -159,3 +170,14 @@ class MultivariatePolynomial:
                     term += f"*{var}^{exp}"
             terms.append(term)
         return " + ".join(terms) if terms else "0"
+
+    def subtract(self, other):
+        result = self.coefficients.copy()
+        for exponents, coeff in other.coefficients.items():
+            if exponents in result:
+                result[exponents] = (result[exponents] - coeff) % self.field.prime
+                if result[exponents] == 0:
+                    del result[exponents]
+            else:
+                result[exponents] = (-coeff) % self.field.prime
+        return MultivariatePolynomial(result, self.variables, self.field)

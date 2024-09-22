@@ -39,6 +39,13 @@ class TestPolynomial(unittest.TestCase):
     def test_evaluate(self):
         self.assertEqual(self.poly1.evaluate(2), (1 + 2 * 2 + 3 * 4) % 17)
 
+    def test_subtract(self):
+        # Test subtraction of two polynomials
+        poly3 = Polynomial([1, 1, 1], self.field)  # Represents 1 + x + x^2
+        result = self.poly1.subtract(poly3)
+        expected = [(1 - 1) % 17, (2 - 1) % 17, (3 - 1) % 17]  # [0, 1, 2]
+        self.assertEqual(result.coefficients.tolist(), expected)
+
 
 class TestMultivariatePolynomial(unittest.TestCase):
     def setUp(self):
@@ -80,10 +87,12 @@ class TestMultivariatePolynomial(unittest.TestCase):
         poly3 = MultivariatePolynomial(
             coefficients={(2, 1): 1, (0, 1): 4}, variables=["x", "y"], field=self.field
         )
-        result = self.poly1.add(
-            poly3
-        )  # Assuming subtract is implemented as add with negation
-        expected = {(2, 1): (3 + 1) % 17, (0, 2): 2, (0, 1): (0 + 4) % 17}
+        result = self.poly1.subtract(poly3)
+        expected = {
+            (2, 1): (3 - 1) % 17,  # 3 - 1 = 2
+            (0, 2): 2,  # 2 - 0 = 2
+            (0, 1): (-4) % 17,  # 0 - 4 = -4 mod 17 = 13
+        }
         self.assertEqual(result.coefficients, expected)
 
     def test_zero_polynomial_addition(self):
