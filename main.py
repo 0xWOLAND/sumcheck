@@ -1,10 +1,22 @@
-from field import FiniteField, Polynomial
+from field import FiniteField, MultivariatePolynomial, Polynomial
+
+
+class Prover:
+    def __init__(self, polynomial: Polynomial):
+        self.polynomial = polynomial
+
+    def prover_step(self, partial_assignment):
+        # Compute the sum over the next variable
+        # Placeholder for prover's computation
+        # Implement the prover's logic here
+        pass
 
 
 class SumCheck:
-    def __init__(self, field: FiniteField, polynomial: Polynomial):
-        self.field = field
+    def __init__(self, polynomial: MultivariatePolynomial, H: FiniteField):
         self.polynomial = polynomial
+        self.H = H
+        self.degree = polynomial.degree('x')
 
     def prover_step(self, partial_assignment):
         # Compute the sum over the next variable

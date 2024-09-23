@@ -26,6 +26,9 @@ class Polynomial:
         self.coefficients = torch.tensor(coefficients, dtype=torch.long)
         self.field = field
 
+    def degree(self):
+        return len(self.coefficients) - 1
+
     def add(self, other):
         max_len = max(len(self.coefficients), len(other.coefficients))
         a = torch.nn.functional.pad(
@@ -76,6 +79,13 @@ class MultivariatePolynomial:
         self.variables = variables
         self.field = field
 
+    def degree(self, variable):
+        if variable not in self.variables:
+            raise ValueError(f"Variable {variable} not found in polynomial")
+        var_index = self.variables.index(variable)
+        return max((exponents[var_index] for exponents in self.coefficients.keys()), default=0)
+
+
     def add(self, other):
         result = self.coefficients.copy()
         for exponents, coeff in other.coefficients.items():
@@ -88,11 +98,6 @@ class MultivariatePolynomial:
         return MultivariatePolynomial(result, self.variables, self.field)
 
     def multiply(self, other):
-        # FFT-based multiplication with correct tensor sizing
-        import torch
-        import math
-
-        # Determine the maximum exponents for each variable in self and other
         max_self_exponents = [
             max((k[i] for k in self.coefficients.keys()), default=0)
             for i in range(len(self.variables))
@@ -102,19 +107,15 @@ class MultivariatePolynomial:
             for i in range(len(self.variables))
         ]
 
-        # Compute the size for each dimension: (max_self + max_other + 1)
         result_size = [
             s + o + 1 for s, o in zip(max_self_exponents, max_other_exponents)
         ]
 
-        # Optionally, pad each dimension to the next power of two for FFT efficiency
         padded_size = [1 << (size - 1).bit_length() for size in result_size]
 
-        # Initialize tensors with the padded sizes
         self_tensor = torch.zeros(padded_size, dtype=torch.float)
         other_tensor = torch.zeros(padded_size, dtype=torch.float)
 
-        # Populate the tensors with coefficients
         for exponents, coeff in self.coefficients.items():
             if all(
                 0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))
@@ -126,17 +127,12 @@ class MultivariatePolynomial:
             ):
                 other_tensor[exponents] = coeff
 
-        # Perform FFT on each dimension
         self_fft = torch.fft.fftn(self_tensor)
         other_fft = torch.fft.fftn(other_tensor)
 
-        # Element-wise multiplication in the frequency domain
         result_fft = self_fft * other_fft
-
-        # Inverse FFT to get the convolution result
         result_ifft = torch.fft.ifftn(result_fft).real.round().long() % self.field.prime
 
-        # Extract non-zero coefficients
         result_coefficients = {}
         it = torch.nonzero(result_ifft)
         for idx in it:
