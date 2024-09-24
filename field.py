@@ -83,8 +83,9 @@ class MultivariatePolynomial:
         if variable not in self.variables:
             raise ValueError(f"Variable {variable} not found in polynomial")
         var_index = self.variables.index(variable)
-        return max((exponents[var_index] for exponents in self.coefficients.keys()), default=0)
-
+        return max(
+            (exponents[var_index] for exponents in self.coefficients.keys()), default=0
+        )
 
     def add(self, other):
         result = self.coefficients.copy()

@@ -159,18 +159,18 @@ class TestMultivariatePolynomial(unittest.TestCase):
         poly = MultivariatePolynomial(
             coefficients={(2, 1): 3, (0, 2): 2},  # Represents 3x^2y + 2y^2
             variables=["x", "y"],
-            field=self.field
+            field=self.field,
         )
-        self.assertEqual(poly.degree('x'), 2)
+        self.assertEqual(poly.degree("x"), 2)
 
     def test_degree_y(self):
         # Test the degree of the multivariate polynomial with respect to 'y'
         poly = MultivariatePolynomial(
             coefficients={(2, 1): 3, (0, 2): 2},  # Represents 3x^2y + 2y^2
             variables=["x", "y"],
-            field=self.field
+            field=self.field,
         )
-        self.assertEqual(poly.degree('y'), 2)
+        self.assertEqual(poly.degree("y"), 2)
 
 
 if __name__ == "__main__":

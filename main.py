@@ -16,7 +16,7 @@ class SumCheck:
     def __init__(self, polynomial: MultivariatePolynomial, H: FiniteField):
         self.polynomial = polynomial
         self.H = H
-        self.degree = polynomial.degree('x')
+        self.degree = polynomial.degree("x")
 
     def prover_step(self, partial_assignment):
         # Compute the sum over the next variable
