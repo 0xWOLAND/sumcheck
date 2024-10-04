@@ -79,15 +79,25 @@ class MultivariatePolynomial:
         self.variables = variables
         self.field = field
 
-    def degree(self, variable):
-        if variable not in self.variables:
-            raise ValueError(f"Variable {variable} not found in polynomial")
-        var_index = self.variables.index(variable)
-        return max(
-            (exponents[var_index] for exponents in self.coefficients.keys()), default=0
-        )
+    def degree(self, variable=None):
+        if variable:
+            if variable not in self.variables:
+                raise ValueError(f"Variable {variable} not found in polynomial")
+            var_index = self.variables.index(variable)
+            return max(
+                (exponents[var_index] for exponents in self.coefficients.keys()),
+                default=0,
+            )
+        else:
+            return max(
+                (sum(exponents) for exponents in self.coefficients.keys()), default=0
+            )
 
     def add(self, other):
+        if self.variables != other.variables:
+            raise ValueError(
+                "Cannot add polynomials with different variables or ordering."
+            )
         result = self.coefficients.copy()
         for exponents, coeff in other.coefficients.items():
             if exponents in result:
@@ -99,50 +109,23 @@ class MultivariatePolynomial:
         return MultivariatePolynomial(result, self.variables, self.field)
 
     def multiply(self, other):
-        max_self_exponents = [
-            max((k[i] for k in self.coefficients.keys()), default=0)
-            for i in range(len(self.variables))
-        ]
-        max_other_exponents = [
-            max((k[i] for k in other.coefficients.keys()), default=0)
-            for i in range(len(self.variables))
-        ]
+        if self.variables != other.variables:
+            raise ValueError(
+                "Cannot multiply polynomials with different variables or ordering."
+            )
 
-        result_size = [
-            s + o + 1 for s, o in zip(max_self_exponents, max_other_exponents)
-        ]
-
-        padded_size = [1 << (size - 1).bit_length() for size in result_size]
-
-        self_tensor = torch.zeros(padded_size, dtype=torch.float)
-        other_tensor = torch.zeros(padded_size, dtype=torch.float)
-
-        for exponents, coeff in self.coefficients.items():
-            if all(
-                0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))
-            ):
-                self_tensor[exponents] = coeff
-        for exponents, coeff in other.coefficients.items():
-            if all(
-                0 <= exponents[i] < padded_size[i] for i in range(len(self.variables))
-            ):
-                other_tensor[exponents] = coeff
-
-        self_fft = torch.fft.fftn(self_tensor)
-        other_fft = torch.fft.fftn(other_tensor)
-
-        result_fft = self_fft * other_fft
-        result_ifft = torch.fft.ifftn(result_fft).real.round().long() % self.field.prime
-
-        result_coefficients = {}
-        it = torch.nonzero(result_ifft)
-        for idx in it:
-            exponents = tuple(idx.tolist())
-            coeff = result_ifft[exponents].item()
-            if coeff != 0:
-                result_coefficients[exponents] = coeff
-
-        return MultivariatePolynomial(result_coefficients, self.variables, self.field)
+        result = {}
+        for exp1, coeff1 in self.coefficients.items():
+            for exp2, coeff2 in other.coefficients.items():
+                new_exp = tuple(e1 + e2 for e1, e2 in zip(exp1, exp2))
+                new_coeff = (coeff1 * coeff2) % self.field.prime
+                if new_exp in result:
+                    result[new_exp] = (result[new_exp] + new_coeff) % self.field.prime
+                else:
+                    result[new_exp] = new_coeff
+                if result[new_exp] == 0:
+                    del result[new_exp]
+        return MultivariatePolynomial(result, self.variables, self.field)
 
     def evaluate(self, assignments):
         """
@@ -152,13 +135,52 @@ class MultivariatePolynomial:
         for exponents, coeff in self.coefficients.items():
             term = coeff
             for var, exp in zip(self.variables, exponents):
+                if var not in assignments:
+                    raise KeyError(f"Variable '{var}' not provided in assignments.")
                 term = (
                     term * pow(assignments[var], exp, self.field.prime)
                 ) % self.field.prime
             result = (result + term) % self.field.prime
         return result
 
+    def partial_evaluate(self, assignments):
+        """
+        Partially evaluates the polynomial by substituting some variables with given values.
+
+        :param assignments: dict mapping variable names to values
+        :return: A new MultivariatePolynomial with the assigned variables evaluated.
+        """
+        remaining_vars = [var for var in self.variables if var not in assignments]
+        new_coefficients = {}
+
+        for exponents, coeff in self.coefficients.items():
+            new_coeff = coeff
+            new_exponents = []
+            for var, exp in zip(self.variables, exponents):
+                if var in assignments:
+                    substitution = pow(assignments[var], exp, self.field.prime)
+                    new_coeff = (new_coeff * substitution) % self.field.prime
+                else:
+                    new_exponents.append(exp)
+            if new_coeff != 0:
+                new_exponents = tuple(new_exponents)
+                # If all remaining exponents are 0, represent as a constant term with empty tuple
+                if all(e == 0 for e in new_exponents):
+                    new_exponents = ()
+                if new_exponents in new_coefficients:
+                    new_coefficients[new_exponents] = (
+                        new_coefficients[new_exponents] + new_coeff
+                    ) % self.field.prime
+                    if new_coefficients[new_exponents] == 0:
+                        del new_coefficients[new_exponents]
+                else:
+                    new_coefficients[new_exponents] = new_coeff
+
+        return MultivariatePolynomial(new_coefficients, remaining_vars, self.field)
+
     def __repr__(self):
+        if not self.coefficients:
+            return "0"
         terms = []
         for exponents, coeff in sorted(self.coefficients.items()):
             term = str(coeff)
@@ -166,9 +188,13 @@ class MultivariatePolynomial:
                 if exp != 0:
                     term += f"*{var}^{exp}"
             terms.append(term)
-        return " + ".join(terms) if terms else "0"
+        return " + ".join(terms)
 
     def subtract(self, other):
+        if self.variables != other.variables:
+            raise ValueError(
+                "Cannot subtract polynomials with different variables or ordering."
+            )
         result = self.coefficients.copy()
         for exponents, coeff in other.coefficients.items():
             if exponents in result:
