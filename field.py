@@ -150,6 +150,11 @@ class MultivariatePolynomial:
         :param assignments: dict mapping variable names to values
         :return: A new MultivariatePolynomial with the assigned variables evaluated.
         """
+        # {{ edit_1 }} Add validation for nonexistent variables
+        unknown_vars = set(assignments.keys()) - set(self.variables)
+        if unknown_vars:
+            raise ValueError(f"Variables {unknown_vars} not found in the polynomial.")
+
         remaining_vars = [var for var in self.variables if var not in assignments]
         new_coefficients = {}
 
@@ -183,12 +188,18 @@ class MultivariatePolynomial:
             return "0"
         terms = []
         for exponents, coeff in sorted(self.coefficients.items()):
-            term = str(coeff)
+            if coeff == 0:
+                continue
+            term = []
+            if coeff != 1 or all(exp == 0 for exp in exponents):
+                term.append(str(coeff))
             for var, exp in zip(self.variables, exponents):
-                if exp != 0:
-                    term += f"*{var}^{exp}"
-            terms.append(term)
-        return " + ".join(terms)
+                if exp == 1:
+                    term.append(var)
+                elif exp > 1:
+                    term.append(f"{var}^{exp}")
+            terms.append("*".join(term))
+        return " + ".join(terms) if terms else "0"
 
     def subtract(self, other):
         if self.variables != other.variables:
@@ -204,3 +215,14 @@ class MultivariatePolynomial:
             else:
                 result[exponents] = (-coeff) % self.field.prime
         return MultivariatePolynomial(result, self.variables, self.field)
+
+    # {{ edit_2 }} *(Optional)* Implement equality for better testing
+    def __eq__(self, other):
+        if not isinstance(other, MultivariatePolynomial):
+            return False
+        if self.variables != other.variables:
+            return False
+        # Compare coefficients, ignoring zero coefficients
+        self_coeffs = {k: v for k, v in self.coefficients.items() if v != 0}
+        other_coeffs = {k: v for k, v in other.coefficients.items() if v != 0}
+        return self_coeffs == other_coeffs

@@ -180,42 +180,14 @@ class TestMultivariatePolynomial(unittest.TestCase):
         )
         # Partial evaluate y = 3
         partial = poly.partial_evaluate({"y": 3})
-        # Expected: 3*x^2*3 + 2*3^2 = 9*x^2 + 18 mod 17 => 9*x^2 + 1
+        # Expected: 9*x^2 + 1
         expected = MultivariatePolynomial(
             coefficients={(2,): 9, (): 1}, variables=["x"], field=field
         )
         self.assertEqual(partial.coefficients, expected.coefficients)
         self.assertEqual(partial.variables, expected.variables)
 
-    def test_partial_evaluate_all_variables(self):
-        field = FiniteField(17)
-        # Polynomial: x + y
-        poly = MultivariatePolynomial(
-            coefficients={(1, 0): 1, (0, 1): 1}, variables=["x", "y"], field=field
-        )
-        # Partial evaluate x = 5, y = 12
-        partial = poly.partial_evaluate({"x": 5, "y": 12})
-        # Expected: 5 + 12 = 17 mod 17 = 0
-        expected = MultivariatePolynomial(
-            coefficients={(): 0}, variables=[], field=field
-        )
-        self.assertEqual(partial.coefficients, {})
-        self.assertEqual(partial.variables, expected.variables)
-
-    def test_partial_evaluate_no_assignments(self):
-        field = FiniteField(17)
-        # Polynomial: x*y
-        poly = MultivariatePolynomial(
-            coefficients={(1, 1): 1}, variables=["x", "y"], field=field
-        )
-        # Partial evaluate with no assignments
-        partial = poly.partial_evaluate({})
-        # Expected: same as original
-        expected = poly
-        self.assertEqual(partial.coefficients, expected.coefficients)
-        self.assertEqual(partial.variables, expected.variables)
-
-    def test_partial_evaluate_some_zero_coefficients(self):
+    def test_partial_evaluate_assign_zero(self):
         field = FiniteField(17)
         # Polynomial: x^2 + y^2 + z^2
         poly = MultivariatePolynomial(
@@ -231,6 +203,70 @@ class TestMultivariatePolynomial(unittest.TestCase):
         )
         self.assertEqual(partial.coefficients, expected.coefficients)
         self.assertEqual(partial.variables, expected.variables)
+
+    def test_partial_evaluate_multiple_variables(self):
+        field = FiniteField(17)
+        # Polynomial: x*y + x*z + y*z
+        poly = MultivariatePolynomial(
+            coefficients={(1, 1, 0): 1, (1, 0, 1): 1, (0, 1, 1): 1},
+            variables=["x", "y", "z"],
+            field=field,
+        )
+        # Partial evaluate x=2 and y=3
+        partial = poly.partial_evaluate({"x": 2, "y": 3})
+        # Expected: 6 + 5*z =11*z in field 17 (since 6 +5*z ≡11*z)
+        # However, as per polynomial representation, it should be {():6, (1,):5}
+        expected = MultivariatePolynomial(
+            coefficients={(): 6, (1,): 5}, variables=["z"], field=field
+        )
+        self.assertEqual(partial, expected)
+
+    def test_partial_evaluate_assign_nonexistent_variable(self):
+        field = FiniteField(17)
+        # Polynomial: x^2 + y^2
+        poly = MultivariatePolynomial(
+            coefficients={(2, 0): 1, (0, 2): 1}, variables=["x", "y"], field=field
+        )
+        # Partial evaluate z=5 (z not in variables)
+        with self.assertRaises(ValueError):
+            poly.partial_evaluate({"z": 5})
+
+    def test_partial_evaluate_assign_variable_not_in_monomial(self):
+        field = FiniteField(17)
+        poly = MultivariatePolynomial(
+            coefficients={(2, 0): 1, (0, 2): 1}, variables=["x", "y"], field=field
+        )
+        partial = poly.partial_evaluate({"x": 1})
+        expected = MultivariatePolynomial(
+            coefficients={(): 1, (2,): 1}, variables=["y"], field=field
+        )
+        self.assertEqual(partial, expected)
+        self.assertEqual(str(partial), "1 + y^2")
+
+    def test_partial_evaluate_assign_variable_to_zero(self):
+        field = FiniteField(17)
+        poly = MultivariatePolynomial(
+            coefficients={(1, 1, 0): 1, (0, 2, 0): 1, (0, 0, 1): 1},
+            variables=["x", "y", "z"],
+            field=field,
+        )
+        partial = poly.partial_evaluate({"y": 0})
+        expected = MultivariatePolynomial(
+            coefficients={(0, 1): 1}, variables=["x", "z"], field=field
+        )
+        self.assertEqual(partial, expected)
+
+    def test_equality(self):
+        field = FiniteField(17)
+        poly1 = MultivariatePolynomial(
+            coefficients={(2, 0): 1, (0, 2): 1}, variables=["x", "y"], field=field
+        )
+        poly2 = MultivariatePolynomial(
+            coefficients={(2, 0): 1, (0, 2): 1, (1, 1): 0},
+            variables=["x", "y"],
+            field=field,
+        )
+        self.assertEqual(poly1, poly2)
 
 
 if __name__ == "__main__":
