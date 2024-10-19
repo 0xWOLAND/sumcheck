@@ -93,6 +93,9 @@ class MultivariatePolynomial:
                 (sum(exponents) for exponents in self.coefficients.keys()), default=0
             )
 
+    def arity(self):
+        return len(self.variables)
+
     def add(self, other):
         if self.variables != other.variables:
             raise ValueError(
@@ -150,7 +153,7 @@ class MultivariatePolynomial:
         :param assignments: dict mapping variable names to values
         :return: A new MultivariatePolynomial with the assigned variables evaluated.
         """
-        # {{ edit_1 }} Add validation for nonexistent variables
+
         unknown_vars = set(assignments.keys()) - set(self.variables)
         if unknown_vars:
             raise ValueError(f"Variables {unknown_vars} not found in the polynomial.")
@@ -216,13 +219,61 @@ class MultivariatePolynomial:
                 result[exponents] = (-coeff) % self.field.prime
         return MultivariatePolynomial(result, self.variables, self.field)
 
-    # {{ edit_2 }} *(Optional)* Implement equality for better testing
     def __eq__(self, other):
         if not isinstance(other, MultivariatePolynomial):
             return False
         if self.variables != other.variables:
             return False
-        # Compare coefficients, ignoring zero coefficients
+
         self_coeffs = {k: v for k, v in self.coefficients.items() if v != 0}
         other_coeffs = {k: v for k, v in other.coefficients.items() if v != 0}
         return self_coeffs == other_coeffs
+
+    def evaluate_on_boolean_hypercube(self) -> int:
+        """
+        Evaluate a multivariate polynomial on all points of the boolean hypercube.
+
+        Args:
+        polynomial (MultivariatePolynomial): The polynomial to evaluate.
+
+        Returns:
+        int: The sum of the polynomial evaluated at all points of the boolean hypercube.
+        """
+        num_variables = len(self.variables)
+        total_sum = 0
+
+        # Iterate over all possible boolean assignments
+        for i in range(2**num_variables):
+            assignment = {}
+            for j, var in enumerate(self.variables):
+                # Use bitwise operations to generate all possible boolean assignments
+                assignment[var] = (i >> j) & 1
+
+            # Evaluate the polynomial at this point and add to the total sum
+            total_sum = self.field.add(total_sum, self.evaluate(assignment))
+
+        return total_sum
+
+    def to_single_variate(self):
+        """
+        Convert the multivariate polynomial to a single-variate polynomial if it has only one variable.
+
+        Returns:
+        Polynomial: A single-variate polynomial if the multivariate polynomial has only one variable.
+        ValueError: If the multivariate polynomial has more than one variable.
+        """
+        if len(self.variables) != 1:
+            raise ValueError(
+                "This polynomial has more than one variable and cannot be converted to single-variate."
+            )
+
+        # Convert the multivariate coefficients to single-variate
+        single_variate_coeffs = [0] * (self.degree() + 1)
+        for exponents, coeff in self.coefficients.items():
+            single_variate_coeffs[exponents[0]] = coeff
+
+        # Remove trailing zeros
+        while single_variate_coeffs and single_variate_coeffs[-1] == 0:
+            single_variate_coeffs.pop()
+
+        return Polynomial(single_variate_coeffs, self.field)

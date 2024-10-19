@@ -1,5 +1,9 @@
 import unittest
-from field import FiniteField, Polynomial, MultivariatePolynomial
+from field import (
+    FiniteField,
+    Polynomial,
+    MultivariatePolynomial,
+)
 
 
 class TestFiniteField(unittest.TestCase):
@@ -267,6 +271,89 @@ class TestMultivariatePolynomial(unittest.TestCase):
             field=field,
         )
         self.assertEqual(poly1, poly2)
+
+    def test_evaluate_on_boolean_hypercube(self):
+        field = FiniteField(17)
+        # Polynomial: x + y + z
+        poly = MultivariatePolynomial(
+            coefficients={(1, 0, 0): 1, (0, 1, 0): 1, (0, 0, 1): 1},
+            variables=["x", "y", "z"],
+            field=field,
+        )
+        result = poly.evaluate_on_boolean_hypercube()
+
+        # Expected result:
+        # (0 + 0 + 0) + (0 + 0 + 1) + (0 + 1 + 0) + (0 + 1 + 1) +
+        # (1 + 0 + 0) + (1 + 0 + 1) + (1 + 1 + 0) + (1 + 1 + 1) = 12
+        expected = 12
+
+        self.assertEqual(result, expected)
+
+    def test_evaluate_on_boolean_hypercube_constant(self):
+        field = FiniteField(17)
+        # Polynomial: 5
+        poly = MultivariatePolynomial(
+            coefficients={(0, 0): 5}, variables=["x", "y"], field=field
+        )
+        result = poly.evaluate_on_boolean_hypercube()
+
+        # Expected result: 5 * 4 = 20 (mod 17) = 3
+        expected = 3
+
+        self.assertEqual(result, expected)
+
+    def test_evaluate_on_boolean_hypercube_quadratic(self):
+        field = FiniteField(17)
+        # Polynomial: x^2 + y^2
+        poly = MultivariatePolynomial(
+            coefficients={(2, 0): 1, (0, 2): 1}, variables=["x", "y"], field=field
+        )
+        result = poly.evaluate_on_boolean_hypercube()
+
+        # Expected result:
+        # (0^2 + 0^2) + (0^2 + 1^2) + (1^2 + 0^2) + (1^2 + 1^2) = 4
+        expected = 4
+
+        self.assertEqual(result, expected)
+
+    def test_to_single_variate(self):
+        field = FiniteField(17)
+        # Polynomial: 3x^2 + 2x + 1
+        poly = MultivariatePolynomial(
+            coefficients={(2,): 3, (1,): 2, (0,): 1}, variables=["x"], field=field
+        )
+        result = poly.to_single_variate()
+
+        self.assertIsInstance(result, Polynomial)
+        self.assertEqual(result.coefficients.tolist(), [1, 2, 3])
+        self.assertEqual(result.field, field)
+
+    def test_to_single_variate_with_trailing_zeros(self):
+        field = FiniteField(17)
+        # Polynomial: 2x^3 + x
+        poly = MultivariatePolynomial(
+            coefficients={(3,): 2, (1,): 1}, variables=["x"], field=field
+        )
+        result = poly.to_single_variate()
+
+        self.assertIsInstance(result, Polynomial)
+        self.assertEqual(result.coefficients.tolist(), [0, 1, 0, 2])
+        self.assertEqual(result.field, field)
+
+    def test_to_single_variate_error(self):
+        field = FiniteField(17)
+        # Polynomial: x + y
+        poly = MultivariatePolynomial(
+            coefficients={(1, 0): 1, (0, 1): 1}, variables=["x", "y"], field=field
+        )
+
+        with self.assertRaises(ValueError) as context:
+            poly.to_single_variate()
+
+        self.assertTrue(
+            "This polynomial has more than one variable and cannot be converted to single-variate."
+            in str(context.exception)
+        )
 
 
 if __name__ == "__main__":
